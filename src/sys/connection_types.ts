@@ -1,4 +1,3 @@
-
 export interface SongInfo {
     name: string,
     loaded: boolean,
@@ -18,10 +17,12 @@ export const SMSG_KEY = {
     PAUSEPLAY: "p",
     SEEK: "s",
     SKIP: "k",
+    NEXT: "n",
     VOLUME: "v",
+    REQ_SYNC: "y",
 } as const
 
-export type CMsgVideoChange = [typeof CMSG_KEY.VIDEO_CHANGE, string | null]
+export type CMsgVideoChange = [typeof CMSG_KEY.VIDEO_CHANGE, string | null, number]
 export type CMsgPausePlay = [typeof CMSG_KEY.PAUSEPLAY, boolean]
 export type CMsgSeek = [typeof CMSG_KEY.SEEK, number]
 export type CMsgVolume = [typeof CMSG_KEY.VOLUME, number]
@@ -32,8 +33,10 @@ export type CMsg = CMsgVideoChange | CMsgPausePlay | CMsgSeek | CMsgVolume | CMs
 
 export type SMsgEnqueue = [typeof SMSG_KEY.ENQUEUE, string]
 export type SMsgSkip = [typeof SMSG_KEY.SKIP]
+export type SMsgNext = [typeof SMSG_KEY.NEXT, number]
 export type SMsgPausePlay = [typeof SMSG_KEY.PAUSEPLAY, boolean]
 export type SMsgSeek = [typeof SMSG_KEY.SEEK, number]
 export type SMsgVolume = [typeof SMSG_KEY.VOLUME, number]
 export type SMsgQueueChange = [typeof SMSG_KEY.QUEUE_CHANGE, string[]]
-export type SMsg = SMsgEnqueue | SMsgSkip | SMsgPausePlay | SMsgSeek | SMsgVolume | SMsgQueueChange
+export type SMsgReqSync = [typeof SMSG_KEY.REQ_SYNC]
+export type SMsg = SMsgEnqueue | SMsgSkip | SMsgNext | SMsgPausePlay | SMsgSeek | SMsgVolume | SMsgQueueChange | SMsgReqSync
