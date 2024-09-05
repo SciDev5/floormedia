@@ -2,6 +2,9 @@ import { SERVER_HOST, SERVER_HOST_SECURE } from "@/app/env";
 import { ConnectionProvider, useConnection } from "@/sys/connection";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import styles from "./r.module.css";
+import { Button, LabelText, NumberInput, STYLE_JOIN_TO_RIGHT, TextInput } from "./basic";
+
 export function R() {
     return (
         <ConnectionProvider not_connected={<>not connected</>}>
@@ -17,7 +20,11 @@ function RConnected() {
             ? <WatchVideo />
             : (
                 <div>
-                    <button onClick={() => set_watch_mode(true)}>enter watch mode</button>
+                    <h1 className={styles.title}>:: clamedia :: <span>media server</span></h1>
+                    <Button
+                        classes={[styles.enter_watch_mode]}
+                        on_click={() => set_watch_mode(true)}
+                    >enter watch mode</Button>
                     <ControlVideo />
                 </div>
             )
@@ -29,20 +36,20 @@ function ControlVideo() {
         setTimeout(() => conn.send_req_sync())
     }, [conn])
     return (
-        <div style={{ display: "flex", flexDirection: "row" }}>
-            <div style={{ flex: "1 1" }}>
+        <div className={styles.control}>
+            <div>
                 playing:
                 <ControlVideoPlayerControls />
             </div>
-            <div style={{ flex: "1 1" }}>
+            <div>
                 request:
                 <ControlVideoRequests />
             </div>
-            <div style={{ flex: "1 1" }}>
+            <div>
                 queue:
                 <ControlVideoQueue />
             </div>
-            <div style={{ flex: "1 1" }}>
+            <div>
                 cached:
                 <ControlVideoCached />
             </div>
@@ -64,10 +71,10 @@ function WatchVideo() {
         const vid = ref.current
         if (vid == null) { return }
         if (conn.last_received.is_playing) {
-            vid.fastSeek((Date.now() - conn.last_received.play_time) / 1000)
+            vid.currentTime = (Date.now() - conn.last_received.play_time) / 1000
             vid.play()
         } else {
-            vid.fastSeek((conn.last_received.play_time) / 1000)
+            vid.currentTime = (conn.last_received.play_time) / 1000
         }
         vid.volume = conn.last_received.volume
     }, [current, conn])
@@ -91,12 +98,12 @@ function WatchVideo() {
         const vid = ref.current
         if (vid == null) { return }
 
-        vid.fastSeek(time / 1000)
+        vid.currentTime = time / 1000
     }, []))
 
     return (
         current && <video
-            style={{ width: "100vw" }}
+            className={styles.watch}
             src={`http${SERVER_HOST_SECURE ? "s" : ""}://${SERVER_HOST}/song/${current}`}
             autoPlay={conn.last_received.is_playing}
             onEnded={() => {
@@ -121,29 +128,35 @@ function ControlVideoPlayerControls() {
     const [volume, set_volume] = useState(conn.last_received.volume)
     conn.on_volume.use_bind(set_volume)
 
+    const [cached, set_cached] = useState(new Map(conn.last_received.cached))
+    conn.on_cache_update.use_bind(() => set_cached(new Map(conn.last_received.cached)))
+
     return (
         <div>
-            <div>{current}</div>
+            {current != null
+                ? (<div>{`"${cached.get(current)!.title}" [${cached.get(current)!.uploader}]`}</div>)
+                : <div>no song playing</div>
+            }
             <div>
-                <button
-                    onClick={() => {
+                <Button
+                    on_click={() => {
                         conn.send_req_pauseplay(!is_playing)
                     }}
-                >{is_playing ? "pause" : "play"}</button>
-                <button
-                    onClick={() => {
+                    classes={[STYLE_JOIN_TO_RIGHT]}
+                >{is_playing ? "pause" : "play"}</Button>
+                <Button
+                    on_click={() => {
                         conn.send_req_skip()
                     }}
-                >skip</button>
-                <input
-                    type="range"
+                >skip</Button>
+                <NumberInput
+                    label={<LabelText>volume</LabelText>}
+                    // is_slider
                     min={0.0}
                     max={1.0}
                     step={0.01}
                     value={volume}
-                    onChange={e => {
-                        conn.send_req_volume(e.currentTarget.valueAsNumber)
-                    }}
+                    set_value={volume => conn.send_req_volume(Math.max(0, Math.min(1, volume)))}
                 />
             </div>
         </div>
@@ -155,14 +168,19 @@ function ControlVideoQueue() {
     const conn = useConnection()
     const [queue, set_queue] = useState(conn.last_received.queue)
     conn.on_queue_change.use_bind(set_queue)
+    const [cached, set_cached] = useState(new Map(conn.last_received.cached))
+    conn.on_cache_update.use_bind(() => set_cached(new Map(conn.last_received.cached)))
 
     return (
         <div>{
-            queue.map((id, i) => (
-                <div key={i}>
-                    {`[${i}] id=${id}`}
-                </div>
-            ))
+            queue.map((id, i) => {
+                const { title, uploader } = cached.get(id)!
+                return (
+                    <div key={i}>
+                        {`${i.toString().padStart(3, "0")} : "${title}" [${uploader}]`}
+                    </div>
+                )
+            })
         }</div>
     )
 }
@@ -176,19 +194,16 @@ function ControlVideoCached() {
     }, [conn, set_cached]))
 
     return (
-        <div>{
+        <div className={styles.cached_videos_list}>{
             cached.map(([id, info]) => (
-                <div key={id}>
-                    <button
-                        onClick={() => {
-                            conn.send_req_enqueue(id)
-                        }}
-                        disabled={!info.loaded}
-                    >
-                        enqueue
-                    </button>
-                    {`"${info.name}"`}{info.loaded ? <></> : " [< ...loading... >]"}
-                </div>
+                <Button key={id}
+                    on_click={() => {
+                        conn.send_req_enqueue(id)
+                    }}
+                    disabled={!info.loaded}
+                >
+                    {`"${info.title}" [${info.uploader}]`}{info.loaded ? <></> : " [< ...loading... >]"}
+                </Button>
             ))
         }</div>
     )
@@ -207,21 +222,18 @@ function ControlVideoRequests() {
 
     return (
         <div>
-            <input
+            <TextInput
                 value={id}
-                onChange={e => set_id(e.currentTarget.value)}
-                onKeyDown={e => {
-                    if (e.key === "Enter") {
-                        submit()
-                    }
-                }}
+                set_value={set_id}
+                on_enter={submit}
+                classes={[STYLE_JOIN_TO_RIGHT]}
             />
-            <button
+            <Button
                 disabled={id === ""}
-                onClick={submit}
+                on_click={submit}
             >
                 request
-            </button>
+            </Button>
         </div>
     )
 }

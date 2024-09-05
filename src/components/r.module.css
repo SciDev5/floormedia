@@ -1,0 +1,62 @@
+.watch {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+
+.control {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding-inline: calc(max(0px, 50vw - 50em));
+}
+
+.control>div {
+    flex: 1 1;
+    min-width: 25em;
+    padding: 2em;
+}
+
+.title {
+    margin: 1em 2em;
+}
+
+.title>span {
+    font-weight: 100;
+}
+
+.enter_watch_mode {
+    display: block;
+    width: 80vw;
+    border: 2px solid #ae6aec;
+    margin-block: 1em !important;
+    margin-left: 10vw !important;
+    color: #ae6aec;
+    background: transparent;
+    transition: color 0.2s, background-color 0.2s;
+}
+
+.enter_watch_mode:hover {
+    color: #000000;
+    background: #ae6aec;
+}
+
+.cached_videos_list {
+    display: flex;
+    flex-direction: column;
+}
+
+.cached_videos_list>button {
+    flex: 0 0;
+}
+
+.cached_videos_list>*:not(:first-child) {
+    margin-top: 0px;
+    border-top-width: 1px;
+}
+
+.cached_videos_list>*:not(:last-child) {
+    margin-bottom: 0px;
+    border-bottom-width: 1px;
+}

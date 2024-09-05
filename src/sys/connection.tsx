@@ -7,7 +7,8 @@ import { SongInfo, CMSG_KEY, CMsgPausePlay, CMsgQueueChange, CMsgSeek, CMsgSongI
 const ConnectionContext = createContext<Connection | null>(null)
 
 const is_SongInfo = is_dict({
-    name: is_str,
+    title: is_str,
+    uploader: is_str,
     loaded: is_bool,
 }) as (v: unknown) => v is SongInfo
 

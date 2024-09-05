@@ -1,5 +1,6 @@
 export interface SongInfo {
-    name: string,
+    title: string,
+    uploader: string,
     loaded: boolean,
 }
 

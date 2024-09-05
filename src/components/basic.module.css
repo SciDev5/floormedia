@@ -1,0 +1,52 @@
+.common_input {
+    background: transparent;
+    border: 2px solid #ffffff;
+    color: #ffffff;
+    padding: 0.3em 0.5em;
+    margin: 0.5em 0.3em;
+
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+
+    display: inline-block;
+    font-size: inherit;
+    font-family: inherit;
+    --h: 2em;
+    height: var(--h);
+    line-height: calc(var(--h) - 0.5em - 5px);
+}
+
+.label {
+    background: #ffffff;
+    color: #000000;
+    line-height: calc(var(--h) - 0.5em - 4px);
+}
+
+
+.button:hover:not(:disabled) {
+    background: #ffffff;
+    color: #000000;
+}
+
+.button:disabled {
+    color: #ffffff77;
+    border-color: #ffffff77;
+}
+
+.input:not([type="range"]) {}
+
+.input:not([type="range"]):hover {
+    background: #ffffff22;
+}
+
+.input[type="range"] {}
+
+
+.join_to_right {
+    border-right-width: 1px;
+    margin-right: 0px;
+}
+
+.join_to_right+.common_input {
+    border-left-width: 1px;
+    margin-left: 0px;
+}
