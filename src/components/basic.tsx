@@ -1,4 +1,4 @@
-import { KeyboardEvent, MouseEvent, ReactNode, useId } from "react";
+import { KeyboardEvent, MouseEvent, ReactNode, useId, useState } from "react";
 
 import styles from "./basic.module.css";
 
@@ -63,15 +63,25 @@ export function NumberInput({
     is_slider?: boolean,
     label?: ReactNode,
 }) {
+    const [value_str, set_value_str] = useState(value.toString())
+
     const id = useId()
     const input = (<input
         id={id}
-        value={value}
+        value={value_str}
         type={(is_slider ?? false) ? "range" : "number"}
         min={min}
         max={max}
         step={step}
-        onChange={e => set_value(e.currentTarget.valueAsNumber)}
+        onChange={e => {
+            set_value_str(e.currentTarget.value)
+            if (isFinite(e.currentTarget.valueAsNumber)) {
+                set_value(e.currentTarget.valueAsNumber)
+            }
+        }}
+        onBlur={() => {
+            set_value_str(value.toString())
+        }}
         onKeyDown={on_enter && gen_onkeydown_from_onenter(on_enter)}
         disabled={disabled}
         className={gen_classname(styles.common_input, styles.input, ...classes ?? [])}
