@@ -1,4 +1,4 @@
-import { KeyboardEvent, MouseEvent, ReactNode, useId, useState } from "react";
+import { KeyboardEvent, MouseEvent, ReactNode, useEffect, useId, useState } from "react";
 
 import styles from "./basic.module.css";
 
@@ -64,6 +64,9 @@ export function NumberInput({
     label?: ReactNode,
 }) {
     const [value_str, set_value_str] = useState(value.toString())
+    useEffect(() => {
+        set_value_str(value.toString())
+    }, [value])
 
     const id = useId()
     const input = (<input
