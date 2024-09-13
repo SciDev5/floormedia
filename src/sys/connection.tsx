@@ -28,6 +28,7 @@ const is_SongInfo = is_dict({
     loaded: is_bool,
     failed: is_bool,
     deleted: is_bool,
+    length: is_number,
 }) as (v: unknown) => v is SongInfo
 
 const is_msg_video_change = is_tuple<CMsgVideoChange>([is_literal(CMSG_KEY.VIDEO_CHANGE), is_in_union([is_str, is_literal<null>(null)]), is_number])

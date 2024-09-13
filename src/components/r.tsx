@@ -1,5 +1,5 @@
 import { ConnectionProvider, SERVER, useConnection } from "@/sys/connection";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./r.module.css";
 import { Button, LabelText, NumberInput, STYLE_JOIN_TO_RIGHT, TextInput } from "./basic";
@@ -38,11 +38,13 @@ function RConnected() {
             ? <WatchVideo />
             : (
                 <div>
-                    <h1 className={styles.title}>:: clamedia :: <span>media server</span></h1>
-                    <Button
-                        classes={[styles.enter_watch_mode]}
-                        on_click={() => set_watch_mode(true)}
-                    >enter watch mode</Button>
+                    <div className={styles.page_header}>
+                        <h1 className={styles.title}>:: clamedia :: <span>media server</span></h1>
+                        <Button
+                            classes={[styles.enter_watch_mode]}
+                            on_click={() => set_watch_mode(true)}
+                        >enter watch mode</Button>
+                    </div>
                     <ControlVideo />
                 </div>
             )
@@ -56,19 +58,19 @@ function ControlVideo() {
     return (
         <div className={styles.control}>
             <div>
-                playing:
+                <span className={styles.head}>playing:</span>
                 <ControlVideoPlayerControls />
             </div>
             <div>
-                request:
+                <span className={styles.head}>request:</span>
                 <ControlVideoRequests />
             </div>
             <div>
-                queue:
+                <span className={styles.head}>queue:</span>
                 <ControlVideoQueue />
             </div>
             <div>
-                cached:
+                <span className={styles.head}>cached:</span>
                 <ControlVideoCached />
             </div>
         </div>
@@ -117,7 +119,10 @@ function WatchVideo() {
         if (vid == null) { return }
 
         vid.currentTime = time / 1000
-    }, []))
+        if (vid.paused && conn.last_received.is_playing) {
+            vid.play()
+        }
+    }, [conn]))
 
     return (
         current ? <video
@@ -152,7 +157,6 @@ function ControlVideoPlayerControls() {
 
     const [cached, set_cached] = useState(new Map(conn.last_received.cached))
     conn.on_cache_update.use_bind(() => set_cached(new Map(conn.last_received.cached)))
-
     return (
         <div>
             {current != null
@@ -161,30 +165,166 @@ function ControlVideoPlayerControls() {
                     : <div>!! unloaded song playing !!</div>
                 : <div>no song playing</div>
             }
-            <div>
-                <Button
-                    on_click={() => {
-                        conn.send_req_pauseplay(!is_playing)
-                    }}
-                    classes={[STYLE_JOIN_TO_RIGHT]}
-                >{is_playing ? "pause" : "play"}</Button>
-                <Button
-                    on_click={() => {
-                        conn.send_req_skip()
-                    }}
-                >skip</Button>
-                <NumberInput
-                    label={<LabelText>volume</LabelText>}
-                    // is_slider
-                    min={0.0}
-                    max={1.0}
-                    step={0.01}
-                    value={volume}
-                    set_value={volume => conn.send_req_volume(Math.max(0, Math.min(1, volume)))}
-                />
+            <div className={styles.controls}>
+                <br />
+                <h4>[playback controls]</h4>
+                <div>
+                    <Button
+                        on_click={() => {
+                            conn.send_req_pauseplay(!is_playing)
+                        }}
+                    >{is_playing ? "pause" : "play"}</Button>
+                </div>
+                <div>
+                    <Button
+                        on_click={() => {
+                            conn.send_req_seek(0)
+                        }}
+                        classes={[STYLE_JOIN_TO_RIGHT]}
+                    >replay</Button>
+                    <Button
+                        on_click={() => {
+                            conn.send_req_skip()
+                        }}
+                    >skip</Button>
+                </div>
+                <div>
+                    <NumberInput
+                        label={<LabelText>volume</LabelText>}
+                        // is_slider
+                        min={0.0}
+                        max={1.0}
+                        step={0.01}
+                        value={volume}
+                        set_value={volume => conn.send_req_volume(Math.max(0, Math.min(1, volume)))}
+                    />
+                </div>
+                <ControlVideoPlayerSeekControls />
             </div>
         </div>
     )
+}
+function ControlVideoPlayerSeekControls() {
+    const conn = useConnection()
+
+    const [current, set_current] = useState(conn.last_received.current)
+    conn.on_video_change.use_bind(useCallback(current => {
+        set_current(current)
+    }, [set_current]))
+
+    const [is_playing, set_is_playing] = useState(conn.last_received.is_playing)
+    const [raw_time, set_raw_time] = useState(conn.last_received.play_time)
+    const [time, _set_time] = useState(conn.last_received.is_playing ? Date.now() - conn.last_received.play_time : conn.last_received.play_time)
+
+    conn.on_pauseplay.bind(useCallback(p => {
+        set_is_playing(p)
+        if (p !== is_playing) {
+            set_raw_time(Date.now() - raw_time)
+        }
+    }, [raw_time, is_playing]))
+    conn.on_seek.bind(useCallback(t => {
+        if (is_playing) {
+            set_raw_time(Date.now() - t)
+        } else {
+            set_raw_time(t)
+        }
+    }, [is_playing]))
+
+    useEffect(() => {
+        console.log(raw_time, is_playing);
+
+        if (is_playing) {
+            const id = setInterval(() => {
+                _set_time(Date.now() - raw_time)
+            }, 50)
+            return () => {
+                clearInterval(id)
+            }
+        } else {
+            _set_time(raw_time)
+        }
+    }, [raw_time, is_playing])
+
+    const len = current != null ? conn.last_received.cached.get(current)?.length ?? 0.0 : 0.0
+    const set_time = useCallback((t: number) => {
+        // _set_time(t * 1000)
+        conn.send_req_seek(t * 1000)
+    }, [conn])
+
+    const t_sec = Math.floor(time / 1000) % 60
+    const t_min = Math.floor(time / 1000 / 60) % 60
+    const t_hrs = Math.floor(time / 1000 / 60 / 60)
+
+    return (<>
+        <br />
+        <h4>[time controls]</h4>
+        <div>
+            <NumberInput
+                is_slider
+                min={0.0}
+                max={len}
+                step={0.01}
+                value={time / 1000}
+                disabled={current == null}
+                set_value={set_time}
+            />
+        </div>
+        <div>
+
+            {Math.floor(len / 60 / 60) > 0 && <NumberInput
+                min={0}
+                max={Math.floor(len / 60 / 60)}
+                step={1}
+                value={t_hrs}
+                disabled={current == null}
+                classes={[STYLE_JOIN_TO_RIGHT, styles.time_thin]}
+                set_value={t => set_time(t_sec + 60 * (t_min + 60 * t))}
+            />}
+            <NumberInput
+                min={0}
+                max={60}
+                step={1}
+                value={t_min}
+                disabled={current == null}
+                classes={[STYLE_JOIN_TO_RIGHT, styles.time_thin]}
+                set_value={t => set_time(t_sec + 60 * (t + 60 * t_hrs))}
+            />
+            <NumberInput
+                min={0}
+                max={60}
+                step={1}
+                value={t_sec}
+                disabled={current == null}
+                classes={[STYLE_JOIN_TO_RIGHT, styles.time_thin]}
+                set_value={t => set_time(t + 60 * (t_min + 60 * t_hrs))}
+            />
+            <LabelText no_join>{`/ ${len > 60 * 60 ? Math.floor(len / 60 / 60).toString() + ":" : ""}${Math.floor((len / 60) % 60).toString().padStart(2, "0")}:${Math.floor(len % 60).toString().padStart(2, "0")}`}</LabelText>
+        </div>
+        <div>
+            <Button classes={[STYLE_JOIN_TO_RIGHT]} on_click={() => set_time(Math.max(0, time / 1000 - 60))}>
+                -60
+            </Button>
+            <Button classes={[STYLE_JOIN_TO_RIGHT]} on_click={() => set_time(Math.max(0, time / 1000 - 15))}>
+                -15
+            </Button>
+            <NumberInput
+                min={0.0}
+                // label={ }
+                max={len}
+                step={1}
+                value={Math.min(Math.floor(time / 1000), len)}
+                disabled={current == null}
+                classes={[STYLE_JOIN_TO_RIGHT]}
+                set_value={set_time}
+            />
+            <Button classes={[STYLE_JOIN_TO_RIGHT]} on_click={() => set_time(time / 1000 + 15)}>
+                +15
+            </Button>
+            <Button classes={[]} on_click={() => set_time(time / 1000 + 60)}>
+                +60
+            </Button>
+        </div>
+    </>)
 }
 
 

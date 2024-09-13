@@ -99,10 +99,12 @@ export function NumberInput({
 }
 export function LabelText({
     children,
+    no_join,
 }: {
     children: ReactNode,
+    no_join?: true,
 }) {
-    return (<span className={`${styles.common_input} ${styles.label} ${styles.join_to_right}`}>
+    return (<span className={`${styles.common_input} ${styles.label} ${no_join ? "" : styles.join_to_right}`}>
         {children}
     </span>)
 }

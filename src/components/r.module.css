@@ -4,6 +4,22 @@
     height: 100vh;
 }
 
+.page_header {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.page_header>*:first-child {
+    flex: 1 1;
+}
+
+.page_header>*:last-child {
+    display: flex;
+    flex: 0 0;
+    min-width: 13em;
+    margin-inline: 2em;
+}
+
 
 .control {
     display: flex;
@@ -18,8 +34,22 @@
     padding: 2em;
 }
 
+.control>div>div {
+    margin-block: 1em;
+}
+
+.control>div>.head {
+    padding: .5em;
+    color: #ffffff;
+    display: block;
+    font-weight: bold;
+    border-bottom: 2px dotted;
+}
+
 .title {
-    margin: 1em 2em;
+    margin: 1rem 2rem;
+    font-size: calc(min(2em, 12vw));
+    min-width: calc(min(2em, 12vw) * 4.3);
 }
 
 .title>span {
@@ -69,4 +99,29 @@
 
 .no_media>* {
     margin-block: 10vh;
+}
+
+.controls>div {
+    display: flex;
+}
+
+.controls>div>* {
+    flex: 1 1;
+}
+
+.controls>div>.time_thin {
+    flex: 0.5 0.5;
+    min-width: 1em;
+}
+
+.controls>div>label {
+    display: flex;
+}
+
+.controls>div>label>* {
+    flex: 1 1;
+}
+
+.controls br {
+    margin-top: 1.5em;
 }

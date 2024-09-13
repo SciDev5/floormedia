@@ -4,6 +4,7 @@ export interface SongInfo {
     loaded: boolean,
     failed: boolean,
     deleted: boolean,
+    length: number,
 }
 
 export const CMSG_KEY = {
