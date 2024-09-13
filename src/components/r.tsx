@@ -240,7 +240,7 @@ function ControlVideoRequests() {
     const submit = useCallback(() => {
         set_id("")
         if (id !== "") {
-            const [, id_] = /^(?:https?:\/\/youtube\.com\/watch\?v=|https?:\/\/youtu\.be\/)?([a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
+            const [, id_] = /^(?:https?:\/\/youtube\.com\/watch\?v=|https?:\/\/youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
             if (id_ == null) {
                 alert("id was not a valid youtube link")
                 return
