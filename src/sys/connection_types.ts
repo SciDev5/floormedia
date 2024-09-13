@@ -2,6 +2,8 @@ export interface SongInfo {
     title: string,
     uploader: string,
     loaded: boolean,
+    failed: boolean,
+    deleted: boolean,
 }
 
 export const CMSG_KEY = {

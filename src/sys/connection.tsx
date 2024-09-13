@@ -1,8 +1,24 @@
-import { SERVER_HOST, SERVER_HOST_SECURE } from "@/app/env";
 import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { EventBinder } from "./useevent";
 import { is_arr, is_bool, is_dict, is_in_union, is_literal, is_number, is_str, is_tuple, try_parse_json } from "./json";
 import { SongInfo, CMSG_KEY, CMsgPausePlay, CMsgQueueChange, CMsgSeek, CMsgSongInfo, CMsg, CMsgVideoChange, CMsgVolume, SMsg, SMSG_KEY } from "./connection_types";
+
+export const SERVER = {
+    get HOST() {
+        if (_SERVER_HOST == null) {
+            _SERVER_HOST = location.hostname + ":3001"
+        }
+        return _SERVER_HOST
+    },
+    get SECURE() {
+        if (_SERVER_HOST_SECURE == null) {
+            _SERVER_HOST_SECURE = window.isSecureContext && location.hostname !== "localhost"
+        }
+        return _SERVER_HOST_SECURE
+    },
+}
+let _SERVER_HOST: string | null = null
+let _SERVER_HOST_SECURE: boolean | null = null
 
 const ConnectionContext = createContext<Connection | null>(null)
 
@@ -10,6 +26,8 @@ const is_SongInfo = is_dict({
     title: is_str,
     uploader: is_str,
     loaded: is_bool,
+    failed: is_bool,
+    deleted: is_bool,
 }) as (v: unknown) => v is SongInfo
 
 const is_msg_video_change = is_tuple<CMsgVideoChange>([is_literal(CMSG_KEY.VIDEO_CHANGE), is_in_union([is_str, is_literal<null>(null)]), is_number])
@@ -23,7 +41,7 @@ const is_msg = is_in_union<CMsg>(
 )
 
 class Connection {
-    private readonly ws = new WebSocket(`ws${SERVER_HOST_SECURE ? "s" : ""}://${SERVER_HOST}/`)
+    private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/`)
 
     readonly on_close = new EventBinder<[]>()
     readonly on_video_change = new EventBinder<[string | null, number]>()

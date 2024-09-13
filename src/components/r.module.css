@@ -60,3 +60,13 @@
     margin-bottom: 0px;
     border-bottom-width: 1px;
 }
+
+.no_media {
+    font-size: 2vh;
+    text-align: center;
+    margin-block: 20vh;
+}
+
+.no_media>* {
+    margin-block: 10vh;
+}

@@ -1,5 +1,4 @@
-import { SERVER_HOST, SERVER_HOST_SECURE } from "@/app/env";
-import { ConnectionProvider, useConnection } from "@/sys/connection";
+import { ConnectionProvider, SERVER, useConnection } from "@/sys/connection";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import styles from "./r.module.css";
@@ -15,6 +14,25 @@ export function R() {
 
 function RConnected() {
     const [watch_mode, set_watch_mode] = useState(false)
+
+    useEffect(() => {
+        if (!watch_mode) return
+        const ev = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                set_watch_mode(false)
+            }
+        }
+        const ev_touch = () => {
+            set_watch_mode(false)
+        }
+        window.addEventListener("keydown", ev)
+        window.addEventListener("touchstart", ev_touch)
+        return () => {
+            window.removeEventListener("keydown", ev)
+            window.removeEventListener("touchstart", ev_touch)
+        }
+    }, [watch_mode])
+
     return (
         watch_mode
             ? <WatchVideo />
@@ -102,15 +120,19 @@ function WatchVideo() {
     }, []))
 
     return (
-        current && <video
+        current ? <video
             className={styles.watch}
-            src={`http${SERVER_HOST_SECURE ? "s" : ""}://${SERVER_HOST}/song/${current}`}
+            src={`http${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/song/${current}`}
             autoPlay={conn.last_received.is_playing}
             onEnded={() => {
                 conn.send_req_next(current_discriminator)
             }}
             ref={ref}
-        />
+        /> : (<div className={styles.no_media}>
+            <h1>... no media playing ...</h1>
+            <h3>queue something at<br />{location.href}</h3>
+        </div>
+        )
     )
 }
 
@@ -134,7 +156,9 @@ function ControlVideoPlayerControls() {
     return (
         <div>
             {current != null
-                ? (<div>{`"${cached.get(current)!.title}" [${cached.get(current)!.uploader}]`}</div>)
+                ? cached.has(current)
+                    ? (<div>{`"${cached.get(current)!.title}" [${cached.get(current)!.uploader}]`}</div>)
+                    : <div>!! unloaded song playing !!</div>
                 : <div>no song playing</div>
             }
             <div>
@@ -195,7 +219,7 @@ function ControlVideoCached() {
 
     return (
         <div className={styles.cached_videos_list}>{
-            cached.map(([id, info]) => (
+            cached.filter(([, info]) => !info.deleted && !info.failed).map(([id, info]) => (
                 <Button key={id}
                     on_click={() => {
                         conn.send_req_enqueue(id)
@@ -214,10 +238,15 @@ function ControlVideoRequests() {
     const [id, set_id] = useState("")
 
     const submit = useCallback(() => {
-        if (id !== "") {
-            conn.send_req_enqueue(id)
-        }
         set_id("")
+        if (id !== "") {
+            const [, id_] = /^(?:https?:\/\/youtube\.com\/watch\?v=|https?:\/\/youtu\.be\/)?([a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
+            if (id_ == null) {
+                alert("id was not a valid youtube link")
+                return
+            }
+            conn.send_req_enqueue(id_)
+        }
     }, [conn, id])
 
     return (
