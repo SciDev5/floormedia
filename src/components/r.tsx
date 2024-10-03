@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./r.module.css";
 import { Button, LabelText, NumberInput, STYLE_JOIN_TO_RIGHT, TextInput } from "./basic";
+import { SongInfo } from "@/sys/connection_types";
 
 export function R() {
     return (
@@ -340,21 +341,70 @@ function ControlVideoCached() {
         set_cached([...conn.last_received.cached.entries()])
     }, [conn, set_cached]))
 
+    const [search, set_search] = useState("")
+
     return (
-        <div className={styles.cached_videos_list}>{
-            cached.filter(([, info]) => !info.deleted && !info.failed).map(([id, info]) => (
-                <Button key={id}
-                    on_click={() => {
-                        conn.send_req_enqueue(id)
-                    }}
-                    disabled={!info.loaded}
-                >
-                    {`"${info.title}" [${info.uploader}]`}{info.loaded ? <></> : " [< ...loading... >]"}
-                </Button>
-            ))
-        }</div>
+        <div className={styles.cached_videos_list}>
+
+            <TextInput
+                label={<LabelText>search</LabelText>}
+                value={search}
+                set_value={set_search}
+            />
+            {
+                cached.filter(([, info]) => (!info.deleted && !info.failed) && (search == "" ? true : info.title.toLowerCase().includes(search.toLowerCase()) || info.uploader.toLowerCase().includes(search.toLowerCase()))).sort(([, a], [, b]) => (a.loaded ? 1 : 0) - (b.loaded ? 1 : 0)).map(([id, info]) => (
+                    <ControlVideoCachedEntry key={id} {...{ id, info }} />
+                ))
+            }
+        </div>
     )
 }
+
+function ControlVideoCachedEntry({ id, info }: { id: string, info: SongInfo }) {
+    const conn = useConnection()
+
+    return (
+        <div className={styles.cached_entry}>
+            <Button
+                on_click={() => {
+                    if (info.loaded) conn.send_req_enqueue(id)
+                }}
+                disabled={!info.loaded}
+                classes={[styles.btn_play]}
+            >
+                {"\u23F5"}
+            </Button>
+            <div
+                className={styles.cached_entry_info}
+                onClick={() => {
+                    if (info.loaded) conn.send_req_enqueue(id)
+                }}
+            >
+                <div>
+                    {info.title}
+                </div>
+                <div>
+                    {info.uploader}
+                </div>
+                {info.loaded //&& false
+                    ? (<></>)
+                    : (<div className={styles.cached_entry_loading}>{"...loading..."}</div>)
+                }
+
+            </div>
+            <Button
+                on_click={() => {
+                    alert("TODO, info editor")
+                }}
+                disabled={!info.loaded}
+                classes={[styles.btn_edit]}
+            >
+                {"⋯"}
+            </Button>
+        </div>
+    )
+}
+
 
 function ControlVideoRequests() {
     const conn = useConnection()

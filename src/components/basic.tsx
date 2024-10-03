@@ -29,20 +29,30 @@ export function TextInput({
     value, set_value,
     on_enter,
     disabled, classes,
+    label,
 }: {
     value: string,
     set_value: (value: string) => any,
     on_enter?: () => any,
     disabled?: boolean,
     classes?: string[],
+    label?: ReactNode,
 }) {
-    return (<input
+    const id = useId()
+    const input = (<input
+        id={id}
         value={value}
         onChange={e => set_value(e.currentTarget.value)}
         onKeyDown={on_enter && gen_onkeydown_from_onenter(on_enter)}
         disabled={disabled}
         className={gen_classname(styles.common_input, styles.input, ...classes ?? [])}
     />)
+    return (label != null
+        ? (<label htmlFor={id}>
+            {label}
+            {input}
+        </label>)
+        : input)
 }
 export function NumberInput({
     value, set_value,
