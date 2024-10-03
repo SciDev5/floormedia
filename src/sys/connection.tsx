@@ -1,7 +1,7 @@
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { EventBinder } from "./useevent";
 import { is_arr, is_bool, is_dict, is_in_union, is_literal, is_number, is_str, is_tuple, try_parse_json } from "./json";
-import { SongInfo, CMSG_KEY, CMsgPausePlay, CMsgQueueChange, CMsgSeek, CMsgSongInfo, CMsg, CMsgVideoChange, CMsgVolume, SMsg, SMSG_KEY } from "./connection_types";
+import { SongInfo, CMSG_KEY, CMsgQueueChange, CMsgSongInfo, CMsg, CMsgVideoChange, CMsgVolume, SMsg, SMSG_KEY, CMsgPlayState, PlayState } from "./connection_types";
 
 export const SERVER = {
     get HOST() {
@@ -31,14 +31,24 @@ const is_SongInfo = is_dict({
     length: is_number,
 }) as (v: unknown) => v is SongInfo
 
+const is_PlayState = is_in_union<PlayState>([
+    is_dict({
+        playing: is_literal<true>(true),
+        time_start: is_number,
+    }),
+    is_dict({
+        playing: is_literal<false>(false),
+        time_at: is_number,
+    }),
+]) as (v: unknown) => v is PlayState
+
 const is_msg_video_change = is_tuple<CMsgVideoChange>([is_literal(CMSG_KEY.VIDEO_CHANGE), is_in_union([is_str, is_literal<null>(null)]), is_number])
-const is_msg_pauseplay = is_tuple<CMsgPausePlay>([is_literal(CMSG_KEY.PAUSEPLAY), is_bool])
-const is_msg_seek = is_tuple<CMsgSeek>([is_literal(CMSG_KEY.SEEK), is_number])
+const is_msg_playstate = is_tuple<CMsgPlayState>([is_literal(CMSG_KEY.PLAY_STATE), is_PlayState])
 const is_msg_volume = is_tuple<CMsgVolume>([is_literal(CMSG_KEY.VOLUME), is_number])
 const is_msg_queue_change = is_tuple<CMsgQueueChange>([is_literal(CMSG_KEY.QUEUE_CHANGED), is_arr(is_str)])
 const is_msg_songinfo = is_tuple<CMsgSongInfo>([is_literal(CMSG_KEY.SONG_INFO), is_str, is_SongInfo])
 const is_msg = is_in_union<CMsg>(
-    [is_msg_video_change, is_msg_pauseplay, is_msg_seek, is_msg_volume, is_msg_queue_change, is_msg_songinfo]
+    [is_msg_video_change, is_msg_playstate, is_msg_volume, is_msg_queue_change, is_msg_songinfo]
 )
 
 class Connection {
@@ -46,8 +56,8 @@ class Connection {
 
     readonly on_close = new EventBinder<[]>()
     readonly on_video_change = new EventBinder<[string | null, number]>()
+    readonly on_playstate_change = new EventBinder<[PlayState]>()
     readonly on_pauseplay = new EventBinder<[boolean]>()
-    readonly on_seek = new EventBinder<[number]>()
     readonly on_volume = new EventBinder<[number]>()
     readonly on_queue_change = new EventBinder<[string[]]>()
     readonly on_cache_update = new EventBinder<[]>()
@@ -57,16 +67,14 @@ class Connection {
         current: string | null,
         current_discriminator: number,
         volume: number,
-        is_playing: boolean,
-        play_time: number,
+        playstate: PlayState,
     } = {
             queue: [],
             cached: new Map(),
             current: null,
             current_discriminator: -1,
             volume: 0.0,
-            is_playing: false,
-            play_time: 0.0,
+            playstate: { playing: false, time_at: 0 },
         }
 
     private readonly on_message = (e: MessageEvent) => {
@@ -81,25 +89,13 @@ class Connection {
                 this.last_received.current_discriminator = data[2]
                 this.on_video_change.dispatch(data[1], data[2])
                 break
-            case CMSG_KEY.PAUSEPLAY:
-                if (this.last_received.is_playing != data[1]) {
-                    this.last_received.is_playing = data[1]
-                    const is_playing = this.last_received.is_playing
-                    if (is_playing) {
-                        this.last_received.play_time = Date.now() - this.last_received.play_time
-                    } else {
-                        this.last_received.play_time = this.last_received.play_time - Date.now()
-                    }
+            case CMSG_KEY.PLAY_STATE:
+                const last_playstate = this.last_received.playstate
+                this.last_received.playstate = data[1]
+                if (last_playstate.playing !== data[1].playing) {
+                    this.on_pauseplay.dispatch(data[1].playing)
                 }
-                this.on_pauseplay.dispatch(data[1])
-                break
-            case CMSG_KEY.SEEK:
-                if (this.last_received.is_playing) {
-                    this.last_received.play_time = Date.now() - data[1]
-                } else {
-                    this.last_received.play_time = data[1]
-                }
-                this.on_seek.dispatch(data[1])
+                this.on_playstate_change.dispatch(data[1])
                 break
             case CMSG_KEY.VOLUME:
                 this.last_received.volume = data[1]
@@ -123,11 +119,34 @@ class Connection {
     send_req_enqueue(id: string) { this.send([SMSG_KEY.ENQUEUE, id]) }
     send_req_skip() { this.send([SMSG_KEY.SKIP]) }
     send_req_next(from_discriminator: number) { this.send([SMSG_KEY.NEXT, from_discriminator]) }
-    send_req_pauseplay(playing: boolean) { this.send([SMSG_KEY.PAUSEPLAY, playing]) }
-    send_req_seek(time: number) { this.send([SMSG_KEY.SEEK, time]) }
+    send_req_playstate(playstate: PlayState) { this.send([SMSG_KEY.PLAY_STATE, playstate]) }
     send_req_volume(volume: number) { this.send([SMSG_KEY.VOLUME, volume]) }
     send_req_queue_change(new_queue: string[]) { this.send([SMSG_KEY.QUEUE_CHANGE, new_queue]) }
     send_req_sync() { this.send([SMSG_KEY.REQ_SYNC]) }
+
+    req_pauseplay(playing: boolean) {
+        const last = this.last_received.playstate
+        if (playing) {
+            if (last.playing) {
+                return
+            } else {
+                this.send_req_playstate({ playing, time_start: Date.now() - last.time_at })
+            }
+        } else {
+            if (last.playing) {
+                this.send_req_playstate({ playing, time_at: Date.now() - last.time_start })
+            } else {
+                return
+            }
+        }
+    }
+    req_seek(time_at: number) {
+        const last = this.last_received.playstate
+        this.send_req_playstate(last.playing
+            ? { playing: true, time_start: Date.now() - time_at }
+            : { playing: false, time_at }
+        )
+    }
 
     constructor(res: () => void, rej: () => void) {
         this.ws.addEventListener("open", () => res())
@@ -137,6 +156,20 @@ class Connection {
     }
     drop() {
         this.ws.close()
+    }
+}
+
+export function usePlayState(conn: Connection): { playing: boolean, get_time: () => number } {
+    const [playstate, set_playstate] = useState(conn.last_received.playstate)
+    conn.on_playstate_change.use_bind(useCallback(playstate => {
+        set_playstate(playstate)
+    }, []))
+
+    return {
+        playing: playstate.playing,
+        get_time: playstate.playing
+            ? () => Date.now() - playstate.time_start
+            : () => playstate.time_at,
     }
 }
 

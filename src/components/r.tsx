@@ -1,4 +1,4 @@
-import { ConnectionProvider, SERVER, useConnection } from "@/sys/connection";
+import { ConnectionProvider, SERVER, useConnection, usePlayState } from "@/sys/connection";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import styles from "./r.module.css";
@@ -39,7 +39,7 @@ function RConnected() {
             : (
                 <div>
                     <div className={styles.page_header}>
-                        <h1 className={styles.title}>:: clamedia :: <span>media server</span></h1>
+                        {/* <h1 className={styles.title}>:: clamedia :: <span>media server</span></h1> */}
                         <Button
                             classes={[styles.enter_watch_mode]}
                             on_click={() => set_watch_mode(true)}
@@ -87,48 +87,35 @@ function WatchVideo() {
         set_current_discriminator(current_discriminator)
     }, [set_current, set_current_discriminator]))
 
+    const { playing, get_time } = usePlayState(conn)
+
     useEffect(() => {
         const vid = ref.current
         if (vid == null) { return }
-        if (conn.last_received.is_playing) {
-            vid.currentTime = (Date.now() - conn.last_received.play_time) / 1000
-            vid.play()
-        } else {
-            vid.currentTime = (conn.last_received.play_time) / 1000
-        }
         vid.volume = conn.last_received.volume
     }, [current, conn])
-    conn.on_pauseplay.use_bind(useCallback(is_playing => {
+    useEffect(() => {
         const vid = ref.current
         if (vid == null) { return }
-
-        if (is_playing) {
+        vid.currentTime = get_time() / 1000
+        if (playing) {
             vid.play()
         } else {
             vid.pause()
         }
-    }, []))
+    }, [current, playing, get_time])
     conn.on_volume.use_bind(useCallback(volume => {
         const vid = ref.current
         if (vid == null) { return }
 
         vid.volume = volume
     }, []))
-    conn.on_seek.use_bind(useCallback(time => {
-        const vid = ref.current
-        if (vid == null) { return }
-
-        vid.currentTime = time / 1000
-        if (vid.paused && conn.last_received.is_playing) {
-            vid.play()
-        }
-    }, [conn]))
 
     return (
         current ? <video
             className={styles.watch}
             src={`http${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/song/${current}`}
-            autoPlay={conn.last_received.is_playing}
+            autoPlay={playing}
             onEnded={() => {
                 conn.send_req_next(current_discriminator)
             }}
@@ -149,7 +136,7 @@ function ControlVideoPlayerControls() {
         set_current(current)
     }, [set_current]))
 
-    const [is_playing, set_is_playing] = useState(conn.last_received.is_playing)
+    const [is_playing, set_is_playing] = useState(conn.last_received.playstate.playing)
     conn.on_pauseplay.use_bind(set_is_playing)
 
     const [volume, set_volume] = useState(conn.last_received.volume)
@@ -171,14 +158,14 @@ function ControlVideoPlayerControls() {
                 <div>
                     <Button
                         on_click={() => {
-                            conn.send_req_pauseplay(!is_playing)
+                            conn.req_pauseplay(!is_playing)
                         }}
                     >{is_playing ? "pause" : "play"}</Button>
                 </div>
                 <div>
                     <Button
                         on_click={() => {
-                            conn.send_req_seek(0)
+                            conn.req_seek(0)
                         }}
                         classes={[STYLE_JOIN_TO_RIGHT]}
                     >replay</Button>
@@ -188,6 +175,7 @@ function ControlVideoPlayerControls() {
                         }}
                     >skip</Button>
                 </div>
+                <br />
                 <div>
                     <NumberInput
                         label={<LabelText>volume</LabelText>}
@@ -195,8 +183,19 @@ function ControlVideoPlayerControls() {
                         min={0.0}
                         max={1.0}
                         step={0.01}
-                        value={volume}
+                        value={Math.round(volume * 1000) / 1000}
                         set_value={volume => conn.send_req_volume(Math.max(0, Math.min(1, volume)))}
+                    />
+                </div>
+                <div>
+                    <NumberInput
+                        // label={<LabelText>volume</LabelText>}
+                        is_slider
+                        min={-2.0}
+                        max={0.0}
+                        step={0.01}
+                        value={Math.log10(Math.max(1e-2, Math.min(1, volume)))}
+                        set_value={log_volume => conn.send_req_volume(log_volume === -2 ? 0 : Math.max(0, Math.min(1, 10 ** log_volume)))}
                     />
                 </div>
                 <ControlVideoPlayerSeekControls />
@@ -212,43 +211,27 @@ function ControlVideoPlayerSeekControls() {
         set_current(current)
     }, [set_current]))
 
-    const [is_playing, set_is_playing] = useState(conn.last_received.is_playing)
-    const [raw_time, set_raw_time] = useState(conn.last_received.play_time)
-    const [time, _set_time] = useState(conn.last_received.is_playing ? Date.now() - conn.last_received.play_time : conn.last_received.play_time)
-
-    conn.on_pauseplay.bind(useCallback(p => {
-        set_is_playing(p)
-        if (p !== is_playing) {
-            set_raw_time(Date.now() - raw_time)
-        }
-    }, [raw_time, is_playing]))
-    conn.on_seek.bind(useCallback(t => {
-        if (is_playing) {
-            set_raw_time(Date.now() - t)
-        } else {
-            set_raw_time(t)
-        }
-    }, [is_playing]))
+    const { playing, get_time } = usePlayState(conn)
+    const [time, set_raw_time] = useState(0)
 
     useEffect(() => {
-        console.log(raw_time, is_playing);
-
-        if (is_playing) {
+        if (current == null) {
+            set_raw_time(0)
+        } else if (playing) {
             const id = setInterval(() => {
-                _set_time(Date.now() - raw_time)
+                set_raw_time(get_time())
             }, 50)
             return () => {
                 clearInterval(id)
             }
         } else {
-            _set_time(raw_time)
+            set_raw_time(get_time())
         }
-    }, [raw_time, is_playing])
+    }, [playing, current, get_time])
 
     const len = current != null ? conn.last_received.cached.get(current)?.length ?? 0.0 : 0.0
     const set_time = useCallback((t: number) => {
-        // _set_time(t * 1000)
-        conn.send_req_seek(t * 1000)
+        conn.req_seek(t * 1000)
     }, [conn])
 
     const t_sec = Math.floor(time / 1000) % 60
