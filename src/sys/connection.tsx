@@ -52,7 +52,7 @@ const is_msg = is_in_union<CMsg>(
 )
 
 class Connection {
-    private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/`)
+    private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/ws`)
 
     readonly on_close = new EventBinder<[]>()
     readonly on_video_change = new EventBinder<[string | null, number]>()
