@@ -48,8 +48,8 @@
 
 .title {
     margin: 1rem 2rem;
-    font-size: calc(min(2em, 12vw));
-    min-width: calc(min(2em, 12vw) * 4.3);
+    font-size: calc(min(1.5em, 12vw));
+    min-width: calc(min(1.5em, 12vw) * 4.3);
 }
 
 .title>span {
@@ -195,4 +195,91 @@
 
 .controls br {
     margin-top: 1.5em;
+}
+
+
+.queue {}
+
+.queue_entry {
+    display: flex;
+    flex-direction: row;
+    margin-block: 1em;
+    border-left: 2px solid #ffffff;
+    background: linear-gradient(90deg, transparent, #000000) #070707;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.queue_entry:hover {
+    background: linear-gradient(90deg, transparent, #101010) #202020;
+}
+
+.queue_entry>.info {
+    flex: 1 1;
+    display: flex;
+    flex-direction: column;
+    padding: 1em;
+}
+
+.queue_entry>.info>div:first-child {
+    flex: 1 1;
+}
+
+.queue_entry>.info>div:last-child {
+    flex: 0 0;
+    opacity: 0.5;
+}
+
+.queue_entry>.buttons {
+    flex: 0 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.queue_entry>.buttons>button {
+    flex: 1 1;
+    width: 3em;
+    color: #ffffff;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.queue_entry>.buttons>.button_remove {
+    background: transparent;
+    border: none;
+}
+
+.queue_entry>.buttons>.button_remove:hover {
+    background: #ffffff;
+    color: #000000;
+}
+
+.queue_entry>.buttons>.button_order {
+    background: transparent;
+    border: 2px solid #ffffff;
+}
+
+.queue_entry>.buttons>.button_order:first-child {
+    border-bottom: none;
+}
+
+.queue_entry>.buttons>.button_order:last-child {
+    border-top: none;
+}
+
+.queue_entry>.buttons>.button_order:hover {
+    background: #ffffff;
+    color: #000000;
+}
+
+.queue_entry>.buttons>.button_order:disabled {
+    background: #101010;
+    color: #aaaaaa;
+    border: none;
+}
+
+.queue_entry>.buttons>.button_order:disabled:first-child {
+    border-bottom: 2px solid #ffffff;
+}
+
+.queue_entry>.buttons>.button_order:disabled:last-child {
+    border-top: 2px solid #ffffff;
 }

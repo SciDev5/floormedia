@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Clamedia Player",
+  title: process.env.NEXT_PUBLIC_NAME + " - " + "Media Server",
   description: "spreading music like the plague",
 };
 

@@ -40,7 +40,7 @@ function RConnected() {
             : (
                 <div>
                     <div className={styles.page_header}>
-                        {/* <h1 className={styles.title}>:: clamedia :: <span>media server</span></h1> */}
+                        <h1 className={styles.title}>:: {process.env.NEXT_PUBLIC_NAME?.toLowerCase() + ""} :: <span>media server</span></h1>
                         <Button
                             classes={[styles.enter_watch_mode]}
                             on_click={() => set_watch_mode(true)}
@@ -63,14 +63,14 @@ function ControlVideo() {
                 <ControlVideoPlayerControls />
             </div>
             <div>
-                <span className={styles.head}>request:</span>
-                <ControlVideoRequests />
-            </div>
-            <div>
                 <span className={styles.head}>queue:</span>
                 <ControlVideoQueue />
             </div>
             <div>
+                <span className={styles.head}>request:</span>
+                <ControlVideoRequests />
+                {/* </div>
+            <div> */}
                 <span className={styles.head}>cached:</span>
                 <ControlVideoCached />
             </div>
@@ -319,19 +319,64 @@ function ControlVideoQueue() {
     const [cached, set_cached] = useState(new Map(conn.last_received.cached))
     conn.on_cache_update.use_bind(() => set_cached(new Map(conn.last_received.cached)))
 
+    const queue_swap = useCallback((i: number, j: number) => {
+        const new_queue = [...queue]
+        new_queue[i] = queue[j]
+        new_queue[j] = queue[i]
+        set_queue(new_queue)
+        conn.send_req_queue_change(new_queue)
+    }, [queue, set_queue, conn])
+    const queue_remove = useCallback((i: number) => {
+        const new_queue = [...queue]
+        new_queue.splice(i, 1)
+        set_queue(new_queue)
+        conn.send_req_queue_change(new_queue)
+    }, [queue, set_queue, conn])
+
     return (
         <div>{
             queue.map((id, i) => {
                 const { title, uploader } = cached.get(id)!
                 return (
-                    <div key={i}>
-                        {`${i.toString().padStart(3, "0")} : "${title}" [${uploader}]`}
+                    <div key={i} className={styles.queue_entry}>
+                        <div className={styles.buttons}>
+                            <button
+                                className={styles.button_remove}
+                                onClick={() => {
+                                    queue_remove(i)
+                                }}
+                            >✕</button>
+                        </div>
+                        <div className={styles.info}>
+                            <div>{title}</div>
+                            <div>{uploader}</div>
+                        </div>
+                        <div className={styles.buttons}>
+                            <button
+                                className={styles.button_order}
+                                onClick={() => {
+                                    queue_swap(i, i - 1)
+                                }}
+                                disabled={i == 0}
+                            >⏶</button>
+                            <button
+                                className={styles.button_order}
+                                onClick={() => {
+                                    queue_swap(i, i + 1)
+                                }}
+                                disabled={i == queue.length - 1}
+                            >⏷</button>
+                        </div>
+                        {/* {`${i.toString().padStart(3, "0")} : "${title}" [${uploader}]`} */}
                     </div>
                 )
             })
         }</div>
     )
 }
+// function ControlVideoQueueEntry() {
+
+// }
 
 function ControlVideoCached() {
     const conn = useConnection()
