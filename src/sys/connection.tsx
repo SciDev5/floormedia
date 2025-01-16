@@ -159,13 +159,15 @@ class Connection {
         )
     }
 
+    n_sync_sent = 0
     readonly do_sync = () => {
+        if (this.n_sync_sent > 32 && (this.n_sync_sent % 4 !== 0)) { return } // only do every fourth ping after the 32nd ping
         this.send([SMSG_KEY.PING, Date.now()])
     }
 
     constructor(res: () => void, rej: () => void) {
         this.ws.addEventListener("open", () => {
-            this.sync_interval_id = setInterval(this.do_sync, 2000)
+            this.sync_interval_id = setInterval(this.do_sync, 500)
             res()
         })
         this.ws.addEventListener("error", () => rej())
