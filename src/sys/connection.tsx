@@ -181,15 +181,40 @@ export function ConnectionProvider({ children, not_connected }: { children: Reac
     const [conn, set_conn] = useState<Connection | null | false>(false)
 
     useEffect(() => {
+        let conn: Connection | null = null
         let unloaded = false
-        const conn = new Connection(
-            () => { if (!unloaded) set_conn(conn) },
-            () => { if (!unloaded) set_conn(false) },
-        )
+        const on_close = () => {
+            if (unloaded) { return }
+            set_conn(false)
+            conn?.drop()
+            conn = null
+
+            setTimeout(() => do_connect(), 500)
+        }
+        const do_connect = () => {
+            let died = false
+            const conn_new = new Connection(
+                () => { if (!unloaded) set_conn(conn_new) },
+                () => {
+                    if (!unloaded) {
+                        set_conn(false)
+                        conn = null
+                        died = true
+
+                        setTimeout(() => do_connect(), 5000)
+                    }
+                },
+            )
+            conn_new.on_close.bind(on_close)
+            if (!died) { conn = conn_new }
+        }
+        do_connect()
         return () => {
+            conn?.on_close.unbind(on_close)
             unloaded = true
             set_conn(false)
-            conn.drop()
+            conn?.drop()
+            conn = null
         }
     }, [])
 

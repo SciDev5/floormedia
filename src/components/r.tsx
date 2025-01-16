@@ -6,15 +6,15 @@ import { Button, LabelText, NumberInput, STYLE_JOIN_TO_RIGHT, TextInput } from "
 import { SongInfo } from "@/sys/connection_types";
 
 export function R() {
+    const [watch_mode, set_watch_mode] = useState(false)
     return (
         <ConnectionProvider not_connected={<>not connected</>}>
-            <RConnected />
+            <RConnected watch_mode={watch_mode} set_watch_mode={set_watch_mode} />
         </ConnectionProvider>
     )
 }
 
-function RConnected() {
-    const [watch_mode, set_watch_mode] = useState(false)
+function RConnected({ watch_mode, set_watch_mode }: { watch_mode: boolean, set_watch_mode: (v: boolean) => void }) {
 
     useEffect(() => {
         if (!watch_mode) return
@@ -32,7 +32,7 @@ function RConnected() {
             window.removeEventListener("keydown", ev)
             window.removeEventListener("touchstart", ev_touch)
         }
-    }, [watch_mode])
+    }, [watch_mode, set_watch_mode])
 
     return (
         watch_mode
