@@ -1,7 +1,8 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { EventBinder } from "./useevent";
 import { is_arr, is_bool, is_dict, is_in_union, is_literal, is_number, is_str, is_tuple, try_parse_json } from "./json";
-import { SongInfo, CMSG_KEY, CMsgQueueChange, CMsgSongInfo, CMsg, CMsgVideoChange, CMsgVolume, SMsg, SMSG_KEY, CMsgPlayState, PlayState } from "./connection_types";
+import { SongInfo, CMSG_KEY, CMsgQueueChange, CMsgSongInfo, CMsg, CMsgVideoChange, CMsgVolume, SMsg, SMSG_KEY, CMsgPlayState, PlayState, CMsgPing } from "./connection_types";
+import { register_ping, synchronized_now } from "./timing";
 
 export const SERVER = {
     get HOST() {
@@ -47,12 +48,15 @@ const is_msg_playstate = is_tuple<CMsgPlayState>([is_literal(CMSG_KEY.PLAY_STATE
 const is_msg_volume = is_tuple<CMsgVolume>([is_literal(CMSG_KEY.VOLUME), is_number])
 const is_msg_queue_change = is_tuple<CMsgQueueChange>([is_literal(CMSG_KEY.QUEUE_CHANGED), is_arr(is_str)])
 const is_msg_songinfo = is_tuple<CMsgSongInfo>([is_literal(CMSG_KEY.SONG_INFO), is_str, is_SongInfo])
+const is_msg_ping = is_tuple<CMsgPing>([is_literal(CMSG_KEY.PING), is_number, is_number])
 const is_msg = is_in_union<CMsg>(
-    [is_msg_video_change, is_msg_playstate, is_msg_volume, is_msg_queue_change, is_msg_songinfo]
+    [is_msg_video_change, is_msg_playstate, is_msg_volume, is_msg_queue_change, is_msg_songinfo, is_msg_ping]
 )
 
 class Connection {
     private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/ws`)
+
+    private sync_interval_id: NodeJS.Timeout | number = -1
 
     readonly on_close = new EventBinder<[]>()
     readonly on_video_change = new EventBinder<[string | null, number]>()
@@ -109,6 +113,13 @@ class Connection {
                 this.last_received.cached.set(data[1], data[2])
                 this.on_cache_update.dispatch()
                 break
+            case CMSG_KEY.PING: {
+                const local_time_bounce = 0.5 * (Date.now() + data[1])
+                const remote_time_bounce = data[2]
+
+                register_ping(local_time_bounce, remote_time_bounce)
+                break
+            }
         }
     }
 
@@ -130,11 +141,11 @@ class Connection {
             if (last.playing) {
                 return
             } else {
-                this.send_req_playstate({ playing, time_start: Date.now() - last.time_at })
+                this.send_req_playstate({ playing, time_start: synchronized_now() - last.time_at })
             }
         } else {
             if (last.playing) {
-                this.send_req_playstate({ playing, time_at: Date.now() - last.time_start })
+                this.send_req_playstate({ playing, time_at: synchronized_now() - last.time_start })
             } else {
                 return
             }
@@ -143,15 +154,25 @@ class Connection {
     req_seek(time_at: number) {
         const last = this.last_received.playstate
         this.send_req_playstate(last.playing
-            ? { playing: true, time_start: Date.now() - time_at }
+            ? { playing: true, time_start: synchronized_now() - time_at }
             : { playing: false, time_at }
         )
     }
 
+    readonly do_sync = () => {
+        this.send([SMSG_KEY.PING, Date.now()])
+    }
+
     constructor(res: () => void, rej: () => void) {
-        this.ws.addEventListener("open", () => res())
+        this.ws.addEventListener("open", () => {
+            this.sync_interval_id = setInterval(this.do_sync, 2000)
+            res()
+        })
         this.ws.addEventListener("error", () => rej())
-        this.ws.addEventListener("close", () => this.on_close.dispatch())
+        this.ws.addEventListener("close", () => {
+            clearInterval(this.sync_interval_id)
+            this.on_close.dispatch()
+        })
         this.ws.addEventListener("message", this.on_message)
     }
     drop() {
@@ -168,7 +189,7 @@ export function usePlayState(conn: Connection): { playing: boolean, get_time: ()
     return {
         playing: playstate.playing,
         get_time: playstate.playing
-            ? () => Date.now() - playstate.time_start
+            ? () => synchronized_now() - playstate.time_start
             : () => playstate.time_at,
     }
 }

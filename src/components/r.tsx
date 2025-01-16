@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./r.module.css";
 import { Button, LabelText, NumberInput, STYLE_JOIN_TO_RIGHT, TextInput } from "./basic";
 import { SongInfo } from "@/sys/connection_types";
+import { synchronized_now } from "@/sys/timing";
 
 export function R() {
     const [watch_mode, set_watch_mode] = useState(false)
@@ -39,6 +40,7 @@ function RConnected({ watch_mode, set_watch_mode }: { watch_mode: boolean, set_w
             ? <WatchVideo />
             : (
                 <div>
+                    <p><TIME /></p>
                     <div className={styles.page_header}>
                         <h1 className={styles.title}>:: {process.env.NEXT_PUBLIC_NAME?.toLowerCase() + ""} :: <span>media server</span></h1>
                         <Button
@@ -50,6 +52,16 @@ function RConnected({ watch_mode, set_watch_mode }: { watch_mode: boolean, set_w
                 </div>
             )
     )
+}
+function TIME() {
+    const [t, st] = useState(0)
+    useEffect(() => {
+        const i = setInterval(() => {
+            st(synchronized_now())
+        })
+        return () => { clearInterval(i) }
+    })
+    return <>{new Date(t).toTimeString()} [{(t / 1000 % 1).toFixed(3).slice(2)}]</>
 }
 function ControlVideo() {
     const conn = useConnection()
@@ -104,6 +116,26 @@ function WatchVideo() {
         } else {
             vid.pause()
         }
+        const SYNC_INTERVAL = 100
+        const K_SYNC = 0.1
+        const interv_id = playing ? setInterval(() => {
+            // set playback rate to catch K_SYNC fraction of the way up to the correct time before the next SYNC_INTERVAL
+            const t_local = vid.currentTime * 1000
+            const t_target = (K_SYNC) * get_time() + (1 - K_SYNC) * t_local
+            const rate = (t_target + SYNC_INTERVAL - t_local) / (SYNC_INTERVAL)
+            if (Math.abs(t_local - t_target) > 2000 || rate < 0.1) {
+                // console.log("JUMP");
+                vid.currentTime = get_time()
+                vid.playbackRate = 1
+            } else if (Math.abs(t_local - t_target) < 5) {
+                // console.log("HOLD");
+                vid.playbackRate = 1
+            } else {
+                // console.log("SPEED", rate.toFixed(2));
+                vid.playbackRate = rate
+            }
+        }, SYNC_INTERVAL) : -1
+        return () => clearInterval(interv_id)
     }, [current, playing, get_time])
     conn.on_volume.use_bind(useCallback(volume => {
         const vid = ref.current
