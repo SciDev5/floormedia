@@ -40,7 +40,6 @@ function RConnected({ watch_mode, set_watch_mode }: { watch_mode: boolean, set_w
             ? <WatchVideo />
             : (
                 <div>
-                    <p><TIME /></p>
                     <div className={styles.page_header}>
                         <h1 className={styles.title}>:: {process.env.NEXT_PUBLIC_NAME?.toLowerCase() + ""} :: <span>media server</span></h1>
                         <Button
@@ -52,16 +51,6 @@ function RConnected({ watch_mode, set_watch_mode }: { watch_mode: boolean, set_w
                 </div>
             )
     )
-}
-function TIME() {
-    const [t, st] = useState(0)
-    useEffect(() => {
-        const i = setInterval(() => {
-            st(synchronized_now())
-        })
-        return () => { clearInterval(i) }
-    })
-    return <>{new Date(t).toTimeString()} [{(t / 1000 % 1).toFixed(3).slice(2)}]</>
 }
 function ControlVideo() {
     const conn = useConnection()
@@ -129,7 +118,9 @@ function WatchVideo() {
                 vid.playbackRate = 1
             } else if (Math.abs(t_local - t_target) < 5) {
                 // console.log("HOLD");
-                vid.playbackRate = 1
+                if (vid.playbackRate !== 1) {
+                    vid.playbackRate = 1
+                }
             } else {
                 // console.log("SPEED", rate.toFixed(2));
                 vid.playbackRate = rate
