@@ -89,7 +89,7 @@ function WatchVideo() {
         set_current_discriminator(current_discriminator)
     }, [set_current, set_current_discriminator]))
 
-    const { playing, get_time } = usePlayState(conn)
+    const { playing, get_time, rate } = usePlayState(conn)
 
     useEffect(() => {
         const vid = ref.current
@@ -111,23 +111,23 @@ function WatchVideo() {
             // set playback rate to catch K_SYNC fraction of the way up to the correct time before the next SYNC_INTERVAL
             const t_local = vid.currentTime * 1000
             const t_target = (K_SYNC) * get_time() + (1 - K_SYNC) * t_local
-            const rate = (t_target + SYNC_INTERVAL - t_local) / (SYNC_INTERVAL)
-            if (Math.abs(t_local - t_target) > 2000 || rate < 0.1) {
+            const syncup_rate = (t_target + SYNC_INTERVAL - t_local) / (SYNC_INTERVAL) * rate
+            if (Math.abs(t_local - t_target) > 2000 || syncup_rate < 0.1) {
                 // console.log("JUMP");
                 vid.currentTime = get_time()
-                vid.playbackRate = 1
+                vid.playbackRate = rate
             } else if (Math.abs(t_local - t_target) < 5) {
                 // console.log("HOLD");
-                if (vid.playbackRate !== 1) {
-                    vid.playbackRate = 1
+                if (vid.playbackRate !== rate) {
+                    vid.playbackRate = rate
                 }
             } else {
-                // console.log("SPEED", rate.toFixed(2));
-                vid.playbackRate = rate
+                // console.log("SPEED", syncup_rate.toFixed(2));
+                vid.playbackRate = syncup_rate
             }
         }, SYNC_INTERVAL) : -1
         return () => clearInterval(interv_id)
-    }, [current, playing, get_time])
+    }, [current, playing, rate, get_time])
     conn.on_volume.use_bind(useCallback(volume => {
         const vid = ref.current
         if (vid == null) { return }
@@ -165,6 +165,9 @@ function ControlVideoPlayerControls() {
 
     const [volume, set_volume] = useState(conn.last_received.volume)
     conn.on_volume.use_bind(set_volume)
+
+    const [rate, set_rate] = useState(conn.last_received.playstate.rate)
+    conn.on_rate.use_bind(set_rate)
 
     const [cached, set_cached] = useState(new Map(conn.last_received.cached))
     conn.on_cache_update.use_bind(() => set_cached(new Map(conn.last_received.cached)))
@@ -220,6 +223,29 @@ function ControlVideoPlayerControls() {
                         step={0.01}
                         value={Math.log10(Math.max(1e-2, Math.min(1, volume)))}
                         set_value={log_volume => conn.send_req_volume(log_volume === -2 ? 0 : Math.max(0, Math.min(1, 10 ** log_volume)))}
+                    />
+                </div>
+                <br />
+                <div>
+                    <NumberInput
+                        label={<LabelText>speed</LabelText>}
+                        // is_slider
+                        min={0.1}
+                        max={10.0}
+                        step={0.01}
+                        value={Math.round(rate * 1000) / 1000}
+                        set_value={log_rate => conn.req_rate(Math.max(0.1, Math.min(10.0, log_rate)))}
+                    />
+                </div>
+                <div>
+                    <NumberInput
+                        // label={<LabelText>nyooom</LabelText>}
+                        is_slider
+                        min={-1.0}
+                        max={1.0}
+                        step={0.01}
+                        value={Math.log10(Math.max(1e-1, Math.min(1e+1, rate)))}
+                        set_value={log_rate => conn.req_rate(10 ** Math.max(-1.0, Math.min(1.0, log_rate)))}
                     />
                 </div>
                 <ControlVideoPlayerSeekControls />

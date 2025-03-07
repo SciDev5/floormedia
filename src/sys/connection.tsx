@@ -36,10 +36,12 @@ const is_PlayState = is_in_union<PlayState>([
     is_dict({
         playing: is_literal<true>(true),
         time_start: is_number,
+        rate: is_number,
     }),
     is_dict({
         playing: is_literal<false>(false),
         time_at: is_number,
+        rate: is_number,
     }),
 ]) as (v: unknown) => v is PlayState
 
@@ -62,6 +64,7 @@ class Connection {
     readonly on_video_change = new EventBinder<[string | null, number]>()
     readonly on_playstate_change = new EventBinder<[PlayState]>()
     readonly on_pauseplay = new EventBinder<[boolean]>()
+    readonly on_rate = new EventBinder<[number]>()
     readonly on_volume = new EventBinder<[number]>()
     readonly on_queue_change = new EventBinder<[string[]]>()
     readonly on_cache_update = new EventBinder<[]>()
@@ -78,7 +81,7 @@ class Connection {
             current: null,
             current_discriminator: -1,
             volume: 0.0,
-            playstate: { playing: false, time_at: 0 },
+            playstate: { playing: false, time_at: 0, rate: 1, },
         }
 
     private readonly on_message = (e: MessageEvent) => {
@@ -98,6 +101,9 @@ class Connection {
                 this.last_received.playstate = data[1]
                 if (last_playstate.playing !== data[1].playing) {
                     this.on_pauseplay.dispatch(data[1].playing)
+                }
+                if (last_playstate.rate !== data[1].rate) {
+                    this.on_rate.dispatch(data[1].rate)
                 }
                 this.on_playstate_change.dispatch(data[1])
                 break
@@ -141,11 +147,11 @@ class Connection {
             if (last.playing) {
                 return
             } else {
-                this.send_req_playstate({ playing, time_start: synchronized_now() - last.time_at })
+                this.send_req_playstate({ playing, time_start: synchronized_now() - last.time_at / last.rate, rate: last.rate })
             }
         } else {
             if (last.playing) {
-                this.send_req_playstate({ playing, time_at: synchronized_now() - last.time_start })
+                this.send_req_playstate({ playing, time_at: (synchronized_now() - last.time_start) * last.rate, rate: last.rate })
             } else {
                 return
             }
@@ -154,8 +160,15 @@ class Connection {
     req_seek(time_at: number) {
         const last = this.last_received.playstate
         this.send_req_playstate(last.playing
-            ? { playing: true, time_start: synchronized_now() - time_at }
-            : { playing: false, time_at }
+            ? { playing: true, time_start: synchronized_now() - time_at / last.rate, rate: last.rate }
+            : { playing: false, time_at, rate: last.rate }
+        )
+    }
+    req_rate(rate: number) {
+        const last = this.last_received.playstate
+        this.send_req_playstate(last.playing
+            ? { playing: true, time_start: synchronized_now() - (synchronized_now() - last.time_start) * last.rate / rate, rate }
+            : { playing: false, time_at: last.time_at, rate }
         )
     }
 
@@ -182,7 +195,7 @@ class Connection {
     }
 }
 
-export function usePlayState(conn: Connection): { playing: boolean, get_time: () => number } {
+export function usePlayState(conn: Connection): { playing: boolean, get_time: () => number, rate: number } {
     const [playstate, set_playstate] = useState(conn.last_received.playstate)
     conn.on_playstate_change.use_bind(useCallback(playstate => {
         set_playstate(playstate)
@@ -191,8 +204,9 @@ export function usePlayState(conn: Connection): { playing: boolean, get_time: ()
     return {
         playing: playstate.playing,
         get_time: playstate.playing
-            ? () => synchronized_now() - playstate.time_start
+            ? () => (synchronized_now() - playstate.time_start) * playstate.rate
             : () => playstate.time_at,
+        rate: playstate.rate,
     }
 }
 
