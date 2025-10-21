@@ -21,7 +21,7 @@ export class Player {
 
     async req_enqueue(song_id: string) {
         const cached = SONGINFO_STASH.data.get(song_id)
-        if (cached == null || cached.deleted) {
+        if (cached == null || cached.deleted || cached.failed) {
             const song_info: SongInfo & { format?: "webm" | "mp4" } = { title: song_id, uploader: "...", loaded: false, failed: false, deleted: false, length: -1 }
             SONGINFO_STASH.data.set(song_id, song_info)
             this.downsync_songinfo(song_id, song_info)

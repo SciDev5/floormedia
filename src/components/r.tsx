@@ -449,7 +449,7 @@ function ControlVideoCached() {
                 set_value={set_search}
             />
             {
-                cached.filter(([, info]) => (!info.deleted && !info.failed) && (search == "" ? true : info.title.toLowerCase().includes(search.toLowerCase()) || info.uploader.toLowerCase().includes(search.toLowerCase()))).sort(([, a], [, b]) => (a.loaded ? 1 : 0) - (b.loaded ? 1 : 0)).map(([id, info]) => (
+                cached.filter(([, info]) => (!info.deleted) && (search == "" ? true : info.title.toLowerCase().includes(search.toLowerCase()) || info.uploader.toLowerCase().includes(search.toLowerCase()))).sort(([, a], [, b]) => (a.loaded ? 1 : 0) - (b.loaded ? 1 : 0)).map(([id, info]) => (
                     <ControlVideoCachedEntry key={id} {...{ id, info }} />
                 ))
             }
@@ -485,7 +485,17 @@ function ControlVideoCachedEntry({ id, info }: { id: string, info: SongInfo }) {
                 </div>
                 {info.loaded //&& false
                     ? (<></>)
-                    : (<div className={styles.cached_entry_loading}>{"...loading..."}</div>)
+                    : info.failed
+                        ? (<div className={styles.cached_entry_failed}>
+                            <Button
+                                on_click={() => {
+                                    conn.send_req_enqueue(id)
+                                }}
+                            >
+                                {"[failed. click to retry]"}
+                            </Button>
+                        </div>)
+                        : (<div className={styles.cached_entry_loading}>{"...loading..."}</div>)
                 }
 
             </div>

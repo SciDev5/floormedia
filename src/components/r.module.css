@@ -162,6 +162,28 @@
     line-height: 20px;
 }
 
+.cached_entry_info>div.cached_entry_failed {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    background: #22000099;
+    text-align: center;
+}
+
+.cached_entry_info>div.cached_entry_failed>button {
+    position: absolute;
+    display: block;
+    left: -3.5em;
+    right: -3.5em;
+    top: 0;
+    bottom: 0;
+    height: unset;
+    margin: 0;
+    border: none;
+}
+
 .no_media {
     font-size: 2vh;
     text-align: center;
