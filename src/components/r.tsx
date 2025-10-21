@@ -139,11 +139,13 @@ function WatchVideo() {
     return (
         current ? <video
             className={styles.watch}
-            src={`http${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/song/${current}`}
+            // src={`http${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/song/${current}`}
+            src={`/api/video/${current}`}
             autoPlay={playing}
             onEnded={() => {
                 conn.send_req_next(current_discriminator)
             }}
+            playsInline
             ref={ref}
         /> : (<div className={styles.no_media}>
             <h1>... no media playing ...</h1>
@@ -516,9 +518,10 @@ function ControlVideoRequests() {
     const submit = useCallback(() => {
         set_id("")
         if (id !== "") {
-            // const [, id_yt] = /^(?:https?:\/\/(?:\w+\.)?youtube\.com\/watch\?v=|https?:\/\/(?:\w+\.)?youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
-            if (/^(?:https?:\/\/(?:\w+\.)?youtube\.com\/watch\?v=|https?:\/\/(?:\w+\.)?youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.test(id.trim())) {
+            const [, id_yt] = /^(?:https?:\/\/(?:\w+\.)?youtube\.com\/watch\?v=|https?:\/\/(?:\w+\.)?youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
+            if (id_yt != null) {
                 // it's a youtube link, fall through
+                conn.send_req_enqueue(id_yt)
             } else if (is_magnet_link(id.trim())) {
                 // it's a magnet link, fall through
             } else {
@@ -526,7 +529,6 @@ function ControlVideoRequests() {
                 alert("id was not a valid youtube/magnet link")
                 return
             }
-            conn.send_req_enqueue(id.trim())
         }
     }, [conn, id])
 

@@ -6,19 +6,23 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prepare": "next-ws patch"
   },
   "dependencies": {
-    "next": "14.2.7",
+    "next": "15.5.6",
+    "next-ws": "^2.1.5",
     "parse-torrent": "^11.0.18",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/parse-torrent": "^5.8.7",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/ws": "^8.18.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.7",
     "typescript": "^5"

@@ -56,7 +56,8 @@ const is_msg = is_in_union<CMsg>(
 )
 
 class Connection {
-    private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/ws`)
+    // private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${SERVER.HOST}/ws`)
+    private readonly ws = new WebSocket(`ws${SERVER.SECURE ? "s" : ""}://${location.host}/api/ws`)
 
     private sync_interval_id: NodeJS.Timeout | number = -1
 
