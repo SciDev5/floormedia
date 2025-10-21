@@ -1,5 +1,6 @@
 import { ConnectionProvider, SERVER, useConnection, usePlayState } from "@/sys/connection";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import parseTorrent from "parse-torrent"
 
 import styles from "./r.module.css";
 import { Button, LabelText, NumberInput, STYLE_JOIN_TO_RIGHT, TextInput } from "./basic";
@@ -499,6 +500,14 @@ function ControlVideoCachedEntry({ id, info }: { id: string, info: SongInfo }) {
     )
 }
 
+function is_magnet_link(uri_maybe: string): boolean {
+    try {
+        parseTorrent(uri_maybe)
+        return true
+    } catch (_) {
+        return false
+    }
+}
 
 function ControlVideoRequests() {
     const conn = useConnection()
@@ -507,12 +516,17 @@ function ControlVideoRequests() {
     const submit = useCallback(() => {
         set_id("")
         if (id !== "") {
-            const [, id_] = /^(?:https?:\/\/(?:\w+\.)?youtube\.com\/watch\?v=|https?:\/\/(?:\w+\.)?youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
-            if (id_ == null) {
-                alert("id was not a valid youtube link")
+            // const [, id_yt] = /^(?:https?:\/\/(?:\w+\.)?youtube\.com\/watch\?v=|https?:\/\/(?:\w+\.)?youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.exec(id.trim()) ?? [, null]
+            if (/^(?:https?:\/\/(?:\w+\.)?youtube\.com\/watch\?v=|https?:\/\/(?:\w+\.)?youtu\.be\/)?([a-zA-Z0-9_-]{6}[a-zA-Z0-9_-]+)(?:.*?)$/.test(id.trim())) {
+                // it's a youtube link, fall through
+            } else if (is_magnet_link(id.trim())) {
+                // it's a magnet link, fall through
+            } else {
+                // it's not anything we allow, give up and cry
+                alert("id was not a valid youtube/magnet link")
                 return
             }
-            conn.send_req_enqueue(id_)
+            conn.send_req_enqueue(id.trim())
         }
     }, [conn, id])
 
